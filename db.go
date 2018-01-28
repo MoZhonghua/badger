@@ -506,6 +506,16 @@ func (db *DB) shouldWriteValueToLSM(e Entry) bool {
 	return len(e.Value) < db.opt.ValueThreshold
 }
 
+func (db *DB) shouldCompressValue(e *Entry) bool {
+	if db.opt.ValueCompressThreshold < 0 {
+		return false
+	} else if db.opt.ValueCompressThreshold == 0 {
+		return true
+	} else {
+		return len(e.Value) >= db.opt.ValueCompressThreshold
+	}
+}
+
 func (db *DB) writeToLSM(b *request) error {
 	if len(b.Ptrs) != len(b.Entries) {
 		return errors.Errorf("Ptrs and Entries don't match: %+v", b)

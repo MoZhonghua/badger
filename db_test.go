@@ -251,6 +251,41 @@ func TestGetAfterDelete(t *testing.T) {
 	})
 }
 
+func TestValueCompression(t *testing.T) {
+	runBadgerTest(t, nil, func(t *testing.T, db *DB) {
+		// populate with one entry
+		bigKey := []byte("key1")
+		bigValue := make([]byte, 128)
+		rand.Read(bigValue)
+		require.True(t, len(bigValue) >= db.opt.ValueThreshold)
+
+		smallKey := []byte("key2")
+		smallValue := make([]byte, 16)
+		rand.Read(smallValue)
+		require.True(t, len(smallValue) < db.opt.ValueThreshold)
+
+		require.NoError(t, db.Update(func(txn *Txn) error {
+			require.NoError(t, txn.Set(bigKey, bigValue))
+			require.NoError(t, txn.Set(smallKey, smallValue))
+			// require.NoError(t, txn.Commit(nil))
+			return nil
+		}))
+
+		txn := db.NewTransaction(false)
+		bigItem, err := txn.Get(bigKey)
+		require.NoError(t, err)
+		require.True(t, (bigItem.meta&bitValueCompressed) != 0)
+		require.EqualValues(t, bigValue, getItemValue(t, bigItem))
+
+		smallItem, err := txn.Get(smallKey)
+		require.NoError(t, err)
+		require.True(t, (smallItem.meta&bitValueCompressed) == 0)
+		require.EqualValues(t, smallValue, getItemValue(t, smallItem))
+
+		txn.Discard()
+	})
+}
+
 func TestTxnTooBig(t *testing.T) {
 	runBadgerTest(t, nil, func(t *testing.T, db *DB) {
 		data := func(i int) []byte {

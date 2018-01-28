@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/y"
+	"github.com/golang/snappy"
 	farm "github.com/dgryski/go-farm"
 	"github.com/pkg/errors"
 )
@@ -295,6 +296,13 @@ func (txn *Txn) SetEntry(e *Entry) error {
 	case int64(len(e.Value)) > txn.db.opt.ValueLogFileSize:
 		return exceedsMaxValueSizeError(e.Value, txn.db.opt.ValueLogFileSize)
 	}
+
+	// compress value
+	if txn.db.shouldCompressValue(e) {
+		e.meta = e.meta | bitValueCompressed
+		e.Value = snappy.Encode(nil, e.Value)
+	}
+
 	if err := txn.checkSize(e); err != nil {
 		return err
 	}

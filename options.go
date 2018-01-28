@@ -57,6 +57,13 @@ type Options struct {
 	MaxLevels           int   // Maximum number of levels of compaction.
 	// If value size >= this threshold, only store value offsets in tree.
 	ValueThreshold int
+
+	// If value size >= this threshold, value is compressed, set to:
+	//  -1: disable compression
+	//   0: always compress
+	//   N: compress when len(value) >= N
+	ValueCompressThreshold int
+
 	// Maximum number of tables to keep in memory, before stalling.
 	NumMemtables int
 	// The following affect how we handle LSM tree L0.
@@ -109,4 +116,5 @@ var DefaultOptions = Options{
 	// MemoryMap to mmap() the value log files
 	ValueLogFileSize: 1 << 30,
 	ValueThreshold:   20,
+	ValueCompressThreshold: 32,
 }

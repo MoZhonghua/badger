@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/options"
+	"github.com/golang/snappy"
 
 	"github.com/dgraph-io/badger/y"
 	farm "github.com/dgryski/go-farm"
@@ -126,15 +127,36 @@ func (item *Item) yieldItemValue() ([]byte, func(), error) {
 		item.slice = new(y.Slice)
 	}
 
+	if (item.meta & bitValuePointer) != 0 {
+	}
+
 	if (item.meta & bitValuePointer) == 0 {
-		val := item.slice.Resize(len(item.vptr))
-		copy(val, item.vptr)
-		return val, nil, nil
+		if (item.meta & bitValueCompressed) == 0 {
+			val := item.slice.Resize(len(item.vptr))
+			copy(val, item.vptr)
+			return val, nil, nil
+		} else {
+			val,err := snappy.Decode(nil, item.vptr)
+			if err != nil {
+				return nil,nil, err
+			}
+			return val, nil, nil
+		}
 	}
 
 	var vp valuePointer
 	vp.Decode(item.vptr)
-	return item.db.vlog.Read(vp, item.slice)
+	buf, cb, err := item.db.vlog.Read(vp, item.slice)
+	if err != nil {
+		return buf, cb, err
+	}
+
+	if (item.meta & bitValueCompressed) == 0 {
+		return buf, cb, err
+	} else {
+		val, err := snappy.Decode(nil, buf)
+		return val, cb, err
+	}
 }
 
 func runCallback(cb func()) {
